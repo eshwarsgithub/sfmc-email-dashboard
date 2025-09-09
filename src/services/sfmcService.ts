@@ -25,6 +25,8 @@ export interface DashboardData {
   }>;
   isRealData: boolean;
   error?: string;
+  connectionStatus?: string;
+  sfmcConnected?: boolean;
 }
 
 class SFMCService {

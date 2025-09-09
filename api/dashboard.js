@@ -1,17 +1,5 @@
-// Simple Express server to proxy SFMC API requests
-const express = require('express');
-const cors = require('cors');
+// Vercel serverless function for SFMC dashboard API
 const axios = require('axios');
-require('dotenv').config();
-
-const app = express();
-const port = 3001;
-
-// Enable CORS for React development server
-app.use(cors({
-  origin: ['http://localhost:5179', 'http://localhost:5178', 'http://localhost:5177', 'http://localhost:5176', 'http://localhost:5175']
-}));
-app.use(express.json());
 
 // SFMC Configuration
 const SFMC_CONFIG = {
@@ -229,12 +217,28 @@ function generateDemoData(daysPeriod) {
     trends,
     campaigns,
     isRealData: false,
-    error: 'Using demo data - SFMC API authentication failed'
+    error: 'Demo data - SFMC API authentication failed',
+    connectionStatus: 'Authentication failed',
+    sfmcConnected: false
   };
 }
 
-// API endpoint for dashboard data
-app.get('/api/dashboard', async (req, res) => {
+// Vercel serverless function handler
+module.exports = async (req, res) => {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   const daysPeriod = parseInt(req.query.period) || 30;
   
   console.log(`📊 Dashboard data requested for ${daysPeriod} days`);
@@ -269,6 +273,7 @@ app.get('/api/dashboard', async (req, res) => {
     demoData.isRealData = true; // We're successfully connected to SFMC
     demoData.error = 'Connected to SFMC - Using intelligent demo data due to API permission limitations';
     demoData.connectionStatus = 'Connected with limited permissions';
+    demoData.sfmcConnected = true;
     
     res.json(demoData);
     
@@ -276,7 +281,7 @@ app.get('/api/dashboard', async (req, res) => {
     console.error('❌ Error fetching dashboard data:', error.message);
     res.json(generateDemoData(daysPeriod));
   }
-});
+};
 
 // Process real SFMC data into dashboard format
 function processRealSFMCData(emailSends, trackingEvents, daysPeriod) {
@@ -301,30 +306,3 @@ function processRealSFMCData(emailSends, trackingEvents, daysPeriod) {
   return data;
 }
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    authenticated: !!accessToken && tokenExpiry && tokenExpiry.getTime() > Date.now()
-  });
-});
-
-// Start server
-app.listen(port, () => {
-  console.log(`🚀 SFMC Dashboard Backend running on http://localhost:${port}`);
-  console.log(`🔧 Environment: ${SFMC_CONFIG.subdomain ? 'Configured' : 'Demo Mode'}`);
-  
-  // Test authentication on startup
-  if (SFMC_CONFIG.clientId && SFMC_CONFIG.clientSecret && SFMC_CONFIG.subdomain) {
-    authenticate().then(success => {
-      if (success) {
-        console.log('🎉 Ready to serve real SFMC data');
-      } else {
-        console.log('⚠️  Will serve demo data only');
-      }
-    });
-  } else {
-    console.log('⚠️  Missing SFMC credentials - demo mode only');
-  }
-});

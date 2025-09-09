@@ -139,10 +139,12 @@ const App: React.FC = () => {
       
       setData(dashboardData);
       setLastUpdated(new Date());
-      setIsConnected(dashboardData.isRealData);
+      setIsConnected(dashboardData.sfmcConnected || dashboardData.isRealData);
       
-      if (!dashboardData.isRealData && dashboardData.error) {
-        setError(`API Error: ${dashboardData.error}`);
+      if (dashboardData.error) {
+        setError(dashboardData.error);
+      } else if (dashboardData.connectionStatus) {
+        setError(dashboardData.connectionStatus);
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -205,7 +207,7 @@ const App: React.FC = () => {
               <p>Real-time insights from Salesforce Marketing Cloud</p>
               <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
                 {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
-                {isConnected ? 'Connected' : 'Demo Mode'}
+                {isConnected ? 'SFMC Connected' : 'Demo Mode'}
               </div>
             </div>
             {error && (
