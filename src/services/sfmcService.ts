@@ -44,8 +44,12 @@ class SFMCService {
 
   async getDashboardData(daysPeriod: number = 30): Promise<DashboardData> {
     try {
-      // Use backend API to avoid CORS issues
-      const response = await axios.get(`http://localhost:3001/api/dashboard`, {
+      // Use backend API - works both locally and on Vercel
+      const apiUrl = process.env.NODE_ENV === 'production' 
+        ? '/api/dashboard' 
+        : 'http://localhost:3001/api/dashboard';
+        
+      const response = await axios.get(apiUrl, {
         params: { period: daysPeriod },
         timeout: 30000
       });
