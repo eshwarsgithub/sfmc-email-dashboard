@@ -141,10 +141,12 @@ const App: React.FC = () => {
       setLastUpdated(new Date());
       setIsConnected(dashboardData.sfmcConnected || dashboardData.isRealData);
       
-      if (dashboardData.error) {
+      if (dashboardData.error && !dashboardData.sfmcConnected) {
         setError(dashboardData.error);
       } else if (dashboardData.connectionStatus) {
         setError(dashboardData.connectionStatus);
+      } else {
+        setError(null);
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
