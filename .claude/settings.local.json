@@ -12,7 +12,8 @@
       "Bash(nslookup:*)",
       "Bash(ping:*)",
       "Bash(del test-manual-token.cjs)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
