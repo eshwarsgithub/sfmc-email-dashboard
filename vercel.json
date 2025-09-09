@@ -1,34 +1,11 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/server.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
-  ],
-  "functions": {
-    "server.cjs": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "env": {
-    "VITE_SFMC_CLIENT_ID": "@vite_sfmc_client_id",
-    "VITE_SFMC_CLIENT_SECRET": "@vite_sfmc_client_secret",
-    "VITE_SFMC_SUBDOMAIN": "@vite_sfmc_subdomain",
-    "VITE_DASHBOARD_TITLE": "@vite_dashboard_title",
-    "VITE_COMPANY_NAME": "@vite_company_name"
-  }
+  ]
 }
