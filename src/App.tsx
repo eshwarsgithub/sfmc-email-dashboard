@@ -298,6 +298,8 @@ const App: React.FC = () => {
           </div>
           <div className="header-controls">
             <select 
+              id="period-selector"
+              name="period-selector"
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
               className="period-selector"

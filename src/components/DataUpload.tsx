@@ -291,6 +291,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                 <input
                   ref={fileInputRef}
                   type="file"
+                  id="csv-file-upload"
+                  name="csv-file-upload"
                   accept=".csv"
                   className="hidden"
                   onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
@@ -328,6 +330,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="text"
+                          id={`campaign-name-${index}`}
+                          name={`campaign-name-${index}`}
                           value={campaign.name}
                           onChange={(e) => updateManualCampaign(index, 'name', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
@@ -341,6 +345,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="number"
+                          id={`campaign-sent-${index}`}
+                          name={`campaign-sent-${index}`}
                           value={campaign.sent}
                           onChange={(e) => updateManualCampaign(index, 'sent', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
@@ -354,6 +360,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="date"
+                          id={`campaign-date-${index}`}
+                          name={`campaign-date-${index}`}
                           value={campaign.date}
                           onChange={(e) => updateManualCampaign(index, 'date', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
@@ -366,6 +374,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="number"
+                          id={`campaign-opened-${index}`}
+                          name={`campaign-opened-${index}`}
                           value={campaign.opened}
                           onChange={(e) => updateManualCampaign(index, 'opened', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
@@ -379,6 +389,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="number"
+                          id={`campaign-clicked-${index}`}
+                          name={`campaign-clicked-${index}`}
                           value={campaign.clicked}
                           onChange={(e) => updateManualCampaign(index, 'clicked', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
@@ -392,6 +404,8 @@ Weekly Newsletter,2024-01-08,12000,11800,3600,540,200,Completed`;
                         </label>
                         <input
                           type="number"
+                          id={`campaign-bounced-${index}`}
+                          name={`campaign-bounced-${index}`}
                           value={campaign.bounced}
                           onChange={(e) => updateManualCampaign(index, 'bounced', e.target.value)}
                           className="w-full border rounded-lg px-3 py-2"
