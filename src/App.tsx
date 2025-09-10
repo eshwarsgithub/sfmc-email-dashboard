@@ -28,6 +28,7 @@ import {
 import sfmcService from './services/sfmcService';
 import type { DashboardData } from './services/sfmcService';
 import DataUpload from './components/DataUpload';
+import DebugPanel from './components/DebugPanel';
 import './App.css';
 
 interface StatCardProps {
@@ -122,6 +123,7 @@ const App: React.FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [dataSource, setDataSource] = useState<'api' | 'csv' | 'manual'>('api');
+  const [showDebug, setShowDebug] = useState(false);
 
   // Add error logging
   useEffect(() => {
@@ -309,6 +311,14 @@ const App: React.FC = () => {
               Export
             </button>
             <button
+              onClick={() => setShowDebug(true)}
+              className="bg-purple-600 text-white flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+              title="Open SFMC API debug panel"
+            >
+              <AlertCircle size={16} />
+              Debug
+            </button>
+            <button
               onClick={handleRefresh}
               disabled={isLoading}
               className="refresh-button"
@@ -459,6 +469,13 @@ const App: React.FC = () => {
         <DataUpload
           onDataUploaded={handleDataUploaded}
           onClose={() => setShowUpload(false)}
+        />
+      )}
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <DebugPanel
+          onClose={() => setShowDebug(false)}
         />
       )}
     </div>

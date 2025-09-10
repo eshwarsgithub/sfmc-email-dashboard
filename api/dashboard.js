@@ -1,7 +1,7 @@
-// Vercel serverless function for SFMC dashboard API
+// Vercel serverless function for SFMC dashboard API with comprehensive debugging
 import axios from 'axios';
 
-// SFMC Configuration
+// Enhanced SFMC Configuration with debugging
 const SFMC_CONFIG = {
   clientId: process.env.VITE_SFMC_CLIENT_ID,
   clientSecret: process.env.VITE_SFMC_CLIENT_SECRET,
@@ -12,21 +12,46 @@ const SFMC_CONFIG = {
 };
 
 let accessToken = SFMC_CONFIG.manualToken;
-let tokenExpiry = SFMC_CONFIG.manualToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null; // 24 hours if manual token
+let tokenExpiry = SFMC_CONFIG.manualToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+let lastAuthError = null;
 
-// Authenticate with SFMC using exact Postman configuration
+// Debug configuration on startup
+console.log('🔧 SFMC API Configuration Debug:');
+console.log('- Client ID:', SFMC_CONFIG.clientId ? `${SFMC_CONFIG.clientId.substring(0, 8)}...` : 'MISSING');
+console.log('- Client Secret:', SFMC_CONFIG.clientSecret ? 'SET' : 'MISSING');
+console.log('- Subdomain:', SFMC_CONFIG.subdomain || 'MISSING');
+console.log('- Auth URL:', SFMC_CONFIG.authUrl);
+console.log('- Base URL:', SFMC_CONFIG.baseUrl);
+console.log('- Manual Token:', SFMC_CONFIG.manualToken ? 'SET' : 'NOT_SET');
+
+// Enhanced authentication with comprehensive debugging
 async function authenticate() {
+  console.log('🔐 Starting SFMC Authentication...');
+  console.log('📋 Auth Details:');
+  console.log('  - Client ID:', SFMC_CONFIG.clientId ? `${SFMC_CONFIG.clientId.substring(0, 8)}...` : 'MISSING');
+  console.log('  - Client Secret:', SFMC_CONFIG.clientSecret ? 'SET' : 'MISSING');
+  console.log('  - Subdomain:', SFMC_CONFIG.subdomain || 'MISSING');
+  
   try {
-    // Use the exact URL and format that works in Postman
-    const authUrl = `https://${SFMC_CONFIG.subdomain}.auth.marketingcloudapis.com//v2/token`;
+    // Fix the double slash in auth URL
+    const authUrl = `https://${SFMC_CONFIG.subdomain}.auth.marketingcloudapis.com/v2/token`;
+    console.log(`🔗 Auth URL: ${authUrl}`);
     
-    console.log(`🔄 Trying authentication URL: ${authUrl}`);
-    
-    const response = await axios.post(authUrl, {
+    const requestPayload = {
       grant_type: 'client_credentials',
       client_id: SFMC_CONFIG.clientId,
-      client_secret: SFMC_CONFIG.clientSecret
-    }, {
+      client_secret: SFMC_CONFIG.clientSecret,
+      scope: 'email_read email_write tracking_read data_extensions_read'
+    };
+    
+    console.log('📤 Request payload (sanitized):', {
+      grant_type: requestPayload.grant_type,
+      client_id: requestPayload.client_id ? `${requestPayload.client_id.substring(0, 8)}...` : 'MISSING',
+      client_secret: requestPayload.client_secret ? 'SET' : 'MISSING',
+      scope: requestPayload.scope
+    });
+    
+    const response = await axios.post(authUrl, requestPayload, {
       headers: {
         'Content-Type': 'application/json'
       },
@@ -36,24 +61,42 @@ async function authenticate() {
     accessToken = response.data.access_token;
     const expiresIn = response.data.expires_in || 3600;
     tokenExpiry = new Date(Date.now() + (expiresIn * 1000));
+    lastAuthError = null;
     
-    console.log('✅ SFMC Authentication successful!');
-    console.log('🔑 Token expires in:', expiresIn, 'seconds');
-    console.log('🌐 REST instance URL:', response.data.rest_instance_url);
-    console.log('📧 Available scopes:', response.data.scope);
+    console.log('✅ SFMC Authentication SUCCESSFUL!');
+    console.log('📊 Auth Response Details:');
+    console.log('  - Token expires in:', expiresIn, 'seconds');
+    console.log('  - Token (partial):', response.data.access_token ? `${response.data.access_token.substring(0, 20)}...` : 'MISSING');
+    console.log('  - REST instance URL:', response.data.rest_instance_url);
+    console.log('  - Available scopes:', response.data.scope);
+    console.log('  - Token type:', response.data.token_type);
     
     return true;
     
   } catch (error) {
-    console.error(`❌ Authentication failed:`, error.message);
+    lastAuthError = error.message;
+    console.error('❌ SFMC Authentication FAILED:');
+    console.error('  - Error Message:', error.message);
+    console.error('  - Error Code:', error.code);
+    
     if (error.response) {
-      console.error('   Status:', error.response.status);
-      console.error('   Headers:', error.response.headers);
-      console.error('   Data:', error.response.data);
+      console.error('  - Response Status:', error.response.status);
+      console.error('  - Response Status Text:', error.response.statusText);
+      console.error('  - Response Headers:', JSON.stringify(error.response.headers, null, 2));
+      console.error('  - Response Data:', JSON.stringify(error.response.data, null, 2));
     }
-    if (error.code) {
-      console.error('   Error Code:', error.code);
+    
+    if (error.request) {
+      console.error('  - Request was made but no response received');
+      console.error('  - Request details:', {
+        method: error.config?.method,
+        url: error.config?.url,
+        headers: error.config?.headers
+      });
     }
+    
+    console.error('  - Full error object keys:', Object.keys(error));
+    
     return false;
   }
 }
@@ -72,49 +115,136 @@ async function ensureAuthenticated() {
   return true;
 }
 
-// Fetch real email sends from SFMC
+// Enhanced email sends fetching with comprehensive debugging
 async function fetchEmailSends(daysPeriod) {
+  console.log(`📧 Starting comprehensive email sends search (${daysPeriod} days)...`);
+  
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysPeriod);
+  const startDateISO = startDate.toISOString();
+  
+  console.log('🗓️ Date filter:', startDateISO);
+  
   const endpoints = [
-    // Try Reports API (often has better access)
-    `${SFMC_CONFIG.baseUrl}/automation/v1/reports`,
-    // Try Email Send Definition API  
-    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/definitions`,
-    // Try Email Messages API
-    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages`,
-    // Try Legacy Send API
-    `${SFMC_CONFIG.baseUrl}/email/v1/send`,
-    // Try Discovery API
-    `${SFMC_CONFIG.baseUrl}/data/v1/metadata`,
-    // Original endpoints
-    `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets`,
-    `${SFMC_CONFIG.baseUrl}/email/v1/sends`,
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Sent/rowset`
+    // Try messaging v1 with date filter
+    {
+      url: `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages`,
+      params: { '$filter': `CreatedDate ge '${startDateISO}'`, '$orderby': 'CreatedDate desc', '$top': 100 },
+      description: 'Messaging V1 with date filter'
+    },
+    // Try messaging v1 without filter
+    {
+      url: `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages`,
+      params: { '$orderby': 'CreatedDate desc', '$top': 100 },
+      description: 'Messaging V1 recent emails'
+    },
+    // Try email definitions
+    {
+      url: `${SFMC_CONFIG.baseUrl}/messaging/v1/email/definitions`,
+      params: { '$top': 100 },
+      description: 'Email definitions'
+    },
+    // Try email v1 sends
+    {
+      url: `${SFMC_CONFIG.baseUrl}/email/v1/send`,
+      params: { '$top': 100 },
+      description: 'Email V1 sends'
+    },
+    // Try data extensions for email sends
+    {
+      url: `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Sent/rowset`,
+      params: { '$top': 100 },
+      description: 'System _Sent data extension'
+    },
+    // Try hub API
+    {
+      url: `${SFMC_CONFIG.baseUrl}/hub/v1/dataevents`,
+      params: { '$filter': 'eventCategoryType eq "TransactionalSendEvents.EmailSent"', '$top': 100 },
+      description: 'Hub events - email sent'
+    },
+    // Try platform events
+    {
+      url: `${SFMC_CONFIG.baseUrl}/platform/v1/events`,
+      params: { '$top': 100 },
+      description: 'Platform events'
+    },
+    // Try automation API
+    {
+      url: `${SFMC_CONFIG.baseUrl}/automation/v1/automations`,
+      params: { '$top': 100 },
+      description: 'Automations (might contain sends)'
+    },
+    // Try assets API
+    {
+      url: `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets`,
+      params: { 'assetType.name': 'email', '$top': 100 },
+      description: 'Email assets'
+    },
+    // Try legacy endpoints
+    {
+      url: `${SFMC_CONFIG.baseUrl}/legacy/v1/email/send`,
+      params: { '$top': 100 },
+      description: 'Legacy email sends'
+    }
   ];
 
   for (let i = 0; i < endpoints.length; i++) {
+    const endpoint = endpoints[i];
     try {
-      console.log(`📧 Trying endpoint ${i + 1}: ${endpoints[i]}`);
+      console.log(`🔍 Testing endpoint ${i + 1}/${endpoints.length}: ${endpoint.description}`);
+      console.log(`   URL: ${endpoint.url}`);
+      console.log(`   Params:`, endpoint.params);
       
-      const response = await axios.get(endpoints[i], {
+      const response = await axios.get(endpoint.url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
-        params: {
-          '$top': 10
-        },
+        params: endpoint.params,
         timeout: 15000
       });
       
-      console.log(`✅ Endpoint ${i + 1} succeeded!`, response.data);
-      return response.data;
+      console.log(`✅ SUCCESS at endpoint ${i + 1}: ${endpoint.description}`);
+      console.log(`   Status: ${response.status} ${response.statusText}`);
+      console.log(`   Response keys:`, Object.keys(response.data));
+      
+      if (response.data.items) {
+        console.log(`   📊 Found ${response.data.items.length} items`);
+        if (response.data.items.length > 0) {
+          console.log(`   Sample item keys:`, Object.keys(response.data.items[0]));
+          console.log(`   Sample item:`, JSON.stringify(response.data.items[0], null, 2));
+        }
+        return response.data;
+      } else if (Array.isArray(response.data)) {
+        console.log(`   📊 Found ${response.data.length} direct array items`);
+        if (response.data.length > 0) {
+          console.log(`   Sample item keys:`, Object.keys(response.data[0]));
+          console.log(`   Sample item:`, JSON.stringify(response.data[0], null, 2));
+        }
+        return { items: response.data };
+      } else {
+        console.log(`   ⚠️ Unexpected response structure:`, response.data);
+        if (Object.keys(response.data).length > 0) {
+          return response.data;
+        }
+      }
+      
     } catch (error) {
-      console.log(`❌ Endpoint ${i + 1} failed:`, error.response?.status, error.response?.data?.message || error.message);
+      console.log(`❌ Endpoint ${i + 1} FAILED: ${endpoint.description}`);
+      
+      if (error.response) {
+        console.log(`   Status: ${error.response.status} ${error.response.statusText}`);
+        console.log(`   Error data:`, JSON.stringify(error.response.data, null, 2));
+        console.log(`   Headers:`, JSON.stringify(error.response.headers, null, 2));
+      } else {
+        console.log(`   Network/Request error:`, error.message);
+        console.log(`   Error code:`, error.code);
+      }
       continue;
     }
   }
   
-  console.log('❌ All email send endpoints failed');
+  console.log('❌ ALL email send endpoints failed');
   return null;
 }
 
@@ -235,62 +365,152 @@ function generateDemoData(daysPeriod) {
   };
 }
 
-// Vercel serverless function handler
+// Enhanced Vercel serverless function handler with comprehensive debugging
 export default async function handler(req, res) {
+  console.log('🚀 ENHANCED Dashboard API Request Received');
+  console.log('📋 Request Details:');
+  console.log('  - Method:', req.method);
+  console.log('  - URL:', req.url);
+  console.log('  - Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('  - Query params:', req.query);
+  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
+    console.log('✅ CORS preflight request handled');
     res.status(200).end();
     return;
   }
 
   if (req.method !== 'GET') {
+    console.log('❌ Invalid method:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const daysPeriod = parseInt(req.query.period) || 30;
+  console.log(`📅 Dashboard data requested for ${daysPeriod} days`);
   
-  console.log(`📊 Dashboard data requested for ${daysPeriod} days`);
+  // Environment debug information
+  console.log('🔍 Environment Debug:');
+  console.log('  - NODE_ENV:', process.env.NODE_ENV);
+  console.log('  - VERCEL:', process.env.VERCEL);
+  console.log('  - VITE_SFMC_CLIENT_ID:', process.env.VITE_SFMC_CLIENT_ID ? 'SET' : 'MISSING');
+  console.log('  - VITE_SFMC_CLIENT_SECRET:', process.env.VITE_SFMC_CLIENT_SECRET ? 'SET' : 'MISSING');
+  console.log('  - VITE_SFMC_SUBDOMAIN:', process.env.VITE_SFMC_SUBDOMAIN || 'MISSING');
+  console.log('  - VITE_SFMC_MANUAL_TOKEN:', process.env.VITE_SFMC_MANUAL_TOKEN ? 'SET' : 'MISSING');
   
   try {
+    console.log('🔐 Starting authentication process...');
     const authenticated = await ensureAuthenticated();
     
+    console.log(`🔑 Authentication result: ${authenticated ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`🎫 Access token available: ${accessToken ? 'YES' : 'NO'}`);
+    
     if (!authenticated) {
-      console.log('🔄 Authentication failed, returning demo data');
-      return res.json(generateDemoData(daysPeriod));
+      console.log('❌ Authentication completely failed - returning demo data with error');
+      const demoData = generateDemoData(daysPeriod);
+      demoData.error = lastAuthError || 'SFMC authentication failed';
+      demoData.debugInfo = {
+        authenticationAttempted: true,
+        authenticationSucceeded: false,
+        lastAuthError: lastAuthError,
+        configurationIssues: {
+          clientId: !SFMC_CONFIG.clientId,
+          clientSecret: !SFMC_CONFIG.clientSecret,
+          subdomain: !SFMC_CONFIG.subdomain
+        }
+      };
+      return res.json(demoData);
     }
 
-    // If we have a token, we're successfully connected to SFMC
+    // Authentication succeeded - now try to fetch real data
     if (accessToken) {
-      console.log('🚀 Fetching real data from SFMC...');
+      console.log('✅ Access token available - attempting real data fetch...');
+      console.log(`   Token (partial): ${accessToken.substring(0, 20)}...`);
       
-      const [emailSends, trackingEvents] = await Promise.all([
+      const [emailSendsResult, trackingEventsResult] = await Promise.allSettled([
         fetchEmailSends(daysPeriod),
         fetchTrackingEvents(daysPeriod)
       ]);
       
-      // Always show connected status if authentication succeeded
-      console.log('✅ SFMC Authentication successful - returning connected status with demo data');
-      const demoData = generateDemoData(daysPeriod);
-      demoData.isRealData = true; // We're successfully connected to SFMC
-      demoData.error = undefined; // Clear any error since we're connected
-      demoData.connectionStatus = 'Connected to SFMC - Using intelligent demo data due to API permission limitations';
-      demoData.sfmcConnected = true;
+      console.log('📊 Data fetch results:');
+      console.log('  - Email sends:', emailSendsResult.status, emailSendsResult.status === 'fulfilled' ? 'SUCCESS' : emailSendsResult.reason);
+      console.log('  - Tracking events:', trackingEventsResult.status, trackingEventsResult.status === 'fulfilled' ? 'SUCCESS' : trackingEventsResult.reason);
       
-      return res.json(demoData);
+      // Check if we got any real data
+      let hasRealData = false;
+      let realDataSummary = {};
+      
+      if (emailSendsResult.status === 'fulfilled' && emailSendsResult.value) {
+        hasRealData = true;
+        realDataSummary.emailSends = emailSendsResult.value.items ? emailSendsResult.value.items.length : 0;
+        console.log('🎯 REAL EMAIL DATA FOUND!');
+      }
+      
+      if (trackingEventsResult.status === 'fulfilled' && trackingEventsResult.value) {
+        hasRealData = true;
+        realDataSummary.trackingEvents = trackingEventsResult.value.items ? trackingEventsResult.value.items.length : 0;
+        console.log('🎯 REAL TRACKING DATA FOUND!');
+      }
+      
+      // Generate response data
+      let responseData;
+      if (hasRealData) {
+        console.log('🌟 Using REAL SFMC data for response!');
+        responseData = processRealSFMCData(
+          emailSendsResult.status === 'fulfilled' ? emailSendsResult.value : null,
+          trackingEventsResult.status === 'fulfilled' ? trackingEventsResult.value : null,
+          daysPeriod
+        );
+        responseData.connectionStatus = 'Successfully connected to SFMC - Real data loaded';
+      } else {
+        console.log('⚠️ No real data found - using enhanced demo data');
+        responseData = generateDemoData(daysPeriod);
+        responseData.isRealData = false; // Authentication succeeded but no data available
+        responseData.connectionStatus = 'Connected to SFMC - API permissions limited, using demo data';
+      }
+      
+      // Always mark as connected if authentication succeeded
+      responseData.sfmcConnected = true;
+      responseData.error = undefined;
+      responseData.debugInfo = {
+        authenticationSucceeded: true,
+        accessTokenAvailable: true,
+        realDataFound: hasRealData,
+        realDataSummary: realDataSummary,
+        apiEndpointsTested: true,
+        tokenExpiresAt: tokenExpiry?.toISOString()
+      };
+      
+      console.log('✅ Returning enhanced response with debug info');
+      return res.json(responseData);
     }
 
-    // Only show disconnected if authentication completely failed
-    console.log('❌ SFMC Authentication failed - showing demo mode');
-    const demoData = generateDemoData(daysPeriod);
-    res.json(demoData);
+    // Should not reach here if authentication succeeded
+    console.log('⚠️ Unexpected state: authenticated but no access token');
+    const fallbackData = generateDemoData(daysPeriod);
+    fallbackData.error = 'Unexpected authentication state';
+    return res.json(fallbackData);
     
   } catch (error) {
-    console.error('❌ Error fetching dashboard data:', error.message);
-    res.json(generateDemoData(daysPeriod));
+    console.error('❌ CRITICAL ERROR in dashboard handler:');
+    console.error('  - Error message:', error.message);
+    console.error('  - Error stack:', error.stack);
+    console.error('  - Error name:', error.name);
+    
+    const errorData = generateDemoData(daysPeriod);
+    errorData.error = `Dashboard handler error: ${error.message}`;
+    errorData.debugInfo = {
+      criticalError: true,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      authenticationAttempted: false
+    };
+    
+    return res.json(errorData);
   }
 }
 
