@@ -459,6 +459,122 @@ class DebugSFMCService {
       };
     }
   }
+
+  // 🔍 ENDPOINT EXPLORER METHODS
+  
+  // Add this method to your existing SFMC service
+  async exploreEmailEndpoints(): Promise<void> {
+    console.log('🔍 TESTING ALL SFMC EMAIL ENDPOINTS...');
+    
+    // Test authentication first
+    await this.ensureValidToken();
+    console.log('✅ Authentication working');
+    
+    const emailEndpoints = [
+      '/messaging/v1/email/messages',
+      '/messaging/v1/email/messages?$top=10',
+      '/email/v1/send',
+      '/email/v1/send?$top=10', 
+      '/platform/v1/emailsend',
+      '/data/v1/customobjectdata/key/Send/rowset',
+      '/data/v1/customobjectdata/key/EmailSend/rowset',
+      '/automation/v1/automations',
+      '/journey/v1/journeys',
+      '/legacy/v1/email/send',
+      '/tracking/v1/events',
+      '/platform/v1/tracking/sent',
+      '/contacts/v1/contacts?$top=5'
+    ];
+
+    for (const endpoint of emailEndpoints) {
+      try {
+        console.log(`🔍 Testing: ${endpoint}`);
+        const response = await this.makeApiCall(endpoint);
+        
+        const hasItems = response.items && response.items.length > 0;
+        const hasData = Object.keys(response).length > 0;
+        
+        if (hasItems) {
+          console.log(`🎯 SUCCESS! Found ${response.items.length} items at ${endpoint}`);
+          console.log('Sample item:', response.items[0]);
+        } else if (hasData) {
+          console.log(`📊 Data found at ${endpoint}:`, Object.keys(response));
+        } else {
+          console.log(`⚪ Empty response from ${endpoint}`);
+        }
+      } catch (error: any) {
+        console.log(`❌ Failed ${endpoint}:`, error.message);
+      }
+    }
+    
+    console.log('🏁 Endpoint exploration complete');
+  }
+
+  // Also add this method to check what data structures exist
+  async checkDataExtensions(): Promise<void> {
+    console.log('📋 CHECKING DATA EXTENSIONS...');
+    
+    try {
+      const response = await this.makeApiCall('/data/v1/customobjectdata');
+      console.log('Data Extensions response:', response);
+      
+      if (response.items) {
+        response.items.forEach((item: any, index: number) => {
+          console.log(`Data Extension ${index + 1}:`, {
+            name: item.name,
+            key: item.customerKey,
+            fields: item.fields ? item.fields.length : 'No fields'
+          });
+        });
+      }
+    } catch (error: any) {
+      console.log('❌ Data Extensions failed:', error.message);
+    }
+  }
+
+  // Method to check recent tracking events
+  async checkTrackingEvents(): Promise<void> {
+    console.log('📊 CHECKING TRACKING EVENTS...');
+    
+    const trackingEndpoints = [
+      '/platform/v1/tracking/sent',
+      '/platform/v1/tracking/opened', 
+      '/platform/v1/tracking/clicked',
+      '/platform/v1/tracking/bounced'
+    ];
+    
+    for (const endpoint of trackingEndpoints) {
+      try {
+        const response = await this.makeApiCall(`${endpoint}?$top=5`);
+        if (response.items && response.items.length > 0) {
+          console.log(`✅ Found ${response.items.length} events at ${endpoint}`);
+          console.log('Sample event:', response.items[0]);
+        } else {
+          console.log(`⚪ No events at ${endpoint}`);
+        }
+      } catch (error: any) {
+        console.log(`❌ Tracking failed ${endpoint}:`, error.message);
+      }
+    }
+  }
+
+  // Comprehensive endpoint explorer - run all exploration methods
+  async exploreAllEndpoints(): Promise<void> {
+    console.log('🚀 STARTING COMPREHENSIVE SFMC ENDPOINT EXPLORATION...');
+    console.log('='.repeat(60));
+    
+    await this.exploreEmailEndpoints();
+    console.log('-'.repeat(40));
+    
+    await this.checkDataExtensions();
+    console.log('-'.repeat(40));
+    
+    await this.checkTrackingEvents();
+    console.log('-'.repeat(40));
+    
+    console.log('✅ COMPREHENSIVE EXPLORATION COMPLETE');
+    console.log('='.repeat(60));
+  }
 }
 
 // Export the class, not an instance

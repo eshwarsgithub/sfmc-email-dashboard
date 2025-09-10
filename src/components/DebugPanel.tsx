@@ -1,6 +1,7 @@
 // Debug panel component to show SFMC API debug information
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle, RefreshCw, Terminal, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, RefreshCw, Terminal, X, Search } from 'lucide-react';
+import DebugSFMCService from '../services/debugSfmcService';
 
 interface DebugPanelProps {
   onClose: () => void;
@@ -10,6 +11,14 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [isExploring, setIsExploring] = useState(false);
+
+  // Initialize debug service
+  const debugService = new DebugSFMCService({
+    clientId: import.meta.env.VITE_SFMC_CLIENT_ID || '',
+    clientSecret: import.meta.env.VITE_SFMC_CLIENT_SECRET || '',
+    subdomain: import.meta.env.VITE_SFMC_SUBDOMAIN || ''
+  });
 
   const fetchDebugInfo = async () => {
     setIsLoading(true);
@@ -109,6 +118,34 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
     }
   };
 
+  const exploreEndpoints = async () => {
+    setIsExploring(true);
+    setLogs(prev => [...prev, '🔍 Starting comprehensive SFMC endpoint exploration...']);
+    
+    try {
+      // Override console.log to capture debug output
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        const message = args.join(' ');
+        setLogs(prev => [...prev, message]);
+        originalConsoleLog(...args);
+      };
+      
+      // Run the endpoint exploration
+      await debugService.exploreAllEndpoints();
+      
+      // Restore original console.log
+      console.log = originalConsoleLog;
+      
+      setLogs(prev => [...prev, '✅ Endpoint exploration complete! Check console for detailed results.']);
+      
+    } catch (error) {
+      setLogs(prev => [...prev, `❌ Endpoint exploration failed: ${(error as Error).message}`]);
+    } finally {
+      setIsExploring(false);
+    }
+  };
+
   useEffect(() => {
     fetchDebugInfo();
   }, []);
@@ -132,7 +169,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
 
         <div className="p-6 overflow-y-auto max-h-[80vh]">
           {/* Control Buttons */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex flex-wrap gap-3 mb-6">
             <button
               onClick={fetchDebugInfo}
               disabled={isLoading}
@@ -144,10 +181,20 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
             
             <button
               onClick={testDirectConnection}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              disabled={isLoading || isExploring}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={16} />
               Test Direct Connection
+            </button>
+            
+            <button
+              onClick={exploreEndpoints}
+              disabled={isLoading || isExploring}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            >
+              <Search size={16} className={isExploring ? 'animate-spin' : ''} />
+              {isExploring ? 'Exploring...' : 'Explore Endpoints'}
             </button>
             
             <button
