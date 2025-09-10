@@ -1,6 +1,5 @@
 // src/services/debugSfmcService.ts
 // Enhanced SFMC Service with detailed debugging
-import axios from 'axios';
 
 interface SFMCConfig {
   clientId: string;
