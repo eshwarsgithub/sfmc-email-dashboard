@@ -1,5 +1,5 @@
 // Vercel serverless function for SFMC dashboard API
-const axios = require('axios');
+import axios from 'axios';
 
 // SFMC Configuration
 const SFMC_CONFIG = {
@@ -224,7 +224,7 @@ function generateDemoData(daysPeriod) {
 }
 
 // Vercel serverless function handler
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -280,7 +280,7 @@ module.exports = async (req, res) => {
     console.error('❌ Error fetching dashboard data:', error.message);
     res.json(generateDemoData(daysPeriod));
   }
-};
+}
 
 // Process real SFMC data into dashboard format
 function processRealSFMCData(emailSends, trackingEvents, daysPeriod) {
