@@ -37,18 +37,19 @@ async function authenticate() {
     const authUrl = `https://${SFMC_CONFIG.subdomain}.auth.marketingcloudapis.com/v2/token`;
     console.log(`🔗 Auth URL: ${authUrl}`);
     
+    // Try a simpler scope first - sometimes complex scopes cause 400 errors
     const requestPayload = {
       grant_type: 'client_credentials',
       client_id: SFMC_CONFIG.clientId,
-      client_secret: SFMC_CONFIG.clientSecret,
-      scope: 'email_read email_write tracking_read data_extensions_read'
+      client_secret: SFMC_CONFIG.clientSecret
+      // Removed scope to test if it's causing the 400 error
     };
     
     console.log('📤 Request payload (sanitized):', {
       grant_type: requestPayload.grant_type,
       client_id: requestPayload.client_id ? `${requestPayload.client_id.substring(0, 8)}...` : 'MISSING',
-      client_secret: requestPayload.client_secret ? 'SET' : 'MISSING',
-      scope: requestPayload.scope
+      client_secret: requestPayload.client_secret ? 'SET' : 'MISSING'
+      // scope removed for testing
     });
     
     const response = await axios.post(authUrl, requestPayload, {
@@ -84,6 +85,15 @@ async function authenticate() {
       console.error('  - Response Status Text:', error.response.statusText);
       console.error('  - Response Headers:', JSON.stringify(error.response.headers, null, 2));
       console.error('  - Response Data:', JSON.stringify(error.response.data, null, 2));
+      
+      // Special handling for 400 errors to provide more context
+      if (error.response.status === 400) {
+        console.error('🔍 400 Bad Request Analysis:');
+        console.error('  - This usually indicates invalid credentials or request format');
+        console.error('  - Check if Client ID and Client Secret are correct');
+        console.error('  - Verify the subdomain matches your SFMC instance');
+        console.error('  - Confirm the scope permissions are valid for your app');
+      }
     }
     
     if (error.request) {

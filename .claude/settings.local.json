@@ -17,7 +17,8 @@
       "Bash(git push:*)",
       "Bash(npm install:*)",
       "Bash(vercel:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:sfmc-dashboard-git-main-srinivas-projects-3965ed5e.vercel.app)"
     ],
     "deny": [],
     "ask": []
