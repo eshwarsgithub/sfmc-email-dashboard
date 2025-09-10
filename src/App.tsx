@@ -21,10 +21,13 @@ import {
   Wifi, 
   WifiOff,
   Activity,
-  Calendar
+  Calendar,
+  Upload,
+  Download
 } from 'lucide-react';
 import sfmcService from './services/sfmcService';
 import type { DashboardData } from './services/sfmcService';
+import DataUpload from './components/DataUpload';
 import './App.css';
 
 interface StatCardProps {
@@ -117,6 +120,8 @@ const App: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [dataSource, setDataSource] = useState<'api' | 'csv' | 'manual'>('api');
 
   // Add error logging
   useEffect(() => {
@@ -171,6 +176,59 @@ const App: React.FC = () => {
     loadDashboardData();
   };
 
+  // Handle uploaded data
+  const handleDataUploaded = (uploadedData: Partial<DashboardData>) => {
+    if (uploadedData.campaigns) {
+      setDataSource(uploadedData.connectionStatus?.includes('CSV') ? 'csv' : 'manual');
+    }
+    
+    const mergedData: DashboardData = {
+      overview: uploadedData.overview || data?.overview || {
+        totalSent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0
+      },
+      trends: uploadedData.trends || data?.trends || [],
+      campaigns: uploadedData.campaigns || data?.campaigns || [],
+      isRealData: true,
+      connectionStatus: uploadedData.connectionStatus,
+      sfmcConnected: uploadedData.sfmcConnected || false
+    };
+
+    setData(mergedData);
+    setLastUpdated(new Date());
+    setIsConnected(true);
+    setShowUpload(false);
+    setError(null);
+  };
+
+  // Export data as CSV
+  const exportData = () => {
+    if (!data) return;
+
+    const csvContent = [
+      ['Campaign Name', 'Date', 'Status', 'Sent', 'Delivered', 'Opened', 'Clicked', 'Bounced', 'Open Rate', 'Click Rate'].join(','),
+      ...data.campaigns.map(campaign => [
+        `"${campaign.name}"`,
+        campaign.date,
+        campaign.status,
+        campaign.sent,
+        campaign.sent, // delivered
+        campaign.opened,
+        campaign.clicked,
+        0, // bounced (if not available)
+        campaign.sent > 0 ? ((campaign.opened / campaign.sent) * 100).toFixed(2) : '0',
+        campaign.sent > 0 ? ((campaign.clicked / campaign.sent) * 100).toFixed(2) : '0'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `email_campaigns_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (!data) {
     return (
       <div className="loading-container">
@@ -209,7 +267,10 @@ const App: React.FC = () => {
               <p>Real-time insights from Salesforce Marketing Cloud</p>
               <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
                 {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
-                {isConnected ? 'SFMC Connected' : 'Demo Mode'}
+                {dataSource === 'api' && isConnected && 'SFMC Connected'}
+                {dataSource === 'csv' && 'CSV Data'}
+                {dataSource === 'manual' && 'Manual Data'}
+                {!isConnected && 'Demo Mode'}
               </div>
             </div>
             {error && (
@@ -230,6 +291,23 @@ const App: React.FC = () => {
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
             </select>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="upload-button"
+              title="Import your email campaign data"
+            >
+              <Upload size={16} />
+              Import Data
+            </button>
+            <button
+              onClick={exportData}
+              disabled={!data?.campaigns?.length}
+              className="export-button"
+              title="Export current data as CSV"
+            >
+              <Download size={16} />
+              Export
+            </button>
             <button
               onClick={handleRefresh}
               disabled={isLoading}
@@ -375,6 +453,14 @@ const App: React.FC = () => {
           <div>Data refreshed every 15 minutes</div>
         </div>
       </footer>
+
+      {/* Data Upload Modal */}
+      {showUpload && (
+        <DataUpload
+          onDataUploaded={handleDataUploaded}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
     </div>
   );
 };
