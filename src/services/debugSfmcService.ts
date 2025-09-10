@@ -461,12 +461,5 @@ class DebugSFMCService {
   }
 }
 
-// Create and export service instance
-const config: SFMCConfig = {
-  clientId: import.meta.env.VITE_SFMC_CLIENT_ID || '',
-  clientSecret: import.meta.env.VITE_SFMC_CLIENT_SECRET || '',
-  subdomain: import.meta.env.VITE_SFMC_SUBDOMAIN || ''
-};
-
-const debugSfmcService = new DebugSFMCService(config);
-export default debugSfmcService;
+// Export the class, not an instance
+export default DebugSFMCService;

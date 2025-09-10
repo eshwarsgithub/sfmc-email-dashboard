@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import sfmcService from './services/sfmcService';
 import type { DashboardData } from './services/sfmcService';
+import DebugSFMCService from './services/debugSfmcService';
 import DataUpload from './components/DataUpload';
 import DebugPanel from './components/DebugPanel';
 import './App.css';
@@ -124,6 +125,14 @@ const App: React.FC = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [dataSource, setDataSource] = useState<'api' | 'csv' | 'manual'>('api');
   const [showDebug, setShowDebug] = useState(false);
+  const [useDebugService, setUseDebugService] = useState(false);
+
+  // Initialize debug service
+  const debugSfmcService = new DebugSFMCService({
+    clientId: import.meta.env.VITE_SFMC_CLIENT_ID || '',
+    clientSecret: import.meta.env.VITE_SFMC_CLIENT_SECRET || '',
+    subdomain: import.meta.env.VITE_SFMC_SUBDOMAIN || ''
+  });
 
   // Add error logging
   useEffect(() => {
@@ -142,7 +151,12 @@ const App: React.FC = () => {
       setError(null);
       
       const period = selectedPeriod === '7days' ? 7 : selectedPeriod === '30days' ? 30 : 90;
-      const dashboardData = await sfmcService.getDashboardData(period);
+      
+      // Use debug service if enabled, otherwise use regular service
+      const serviceToUse = useDebugService ? debugSfmcService : sfmcService;
+      console.log(`🔄 Using ${useDebugService ? 'Debug' : 'Regular'} SFMC Service`);
+      
+      const dashboardData = await serviceToUse.getDashboardData(period);
       
       setData(dashboardData);
       setLastUpdated(new Date());
@@ -171,7 +185,7 @@ const App: React.FC = () => {
     // Set up auto-refresh every 15 minutes
     const interval = setInterval(() => loadDashboardData(false), 15 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [selectedPeriod]);
+  }, [selectedPeriod, useDebugService]);
 
   // Manual refresh function
   const handleRefresh = () => {
@@ -311,12 +325,24 @@ const App: React.FC = () => {
               Export
             </button>
             <button
+              onClick={() => setUseDebugService(!useDebugService)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                useDebugService 
+                ? 'bg-green-600 text-white hover:bg-green-700' 
+                : 'bg-gray-600 text-white hover:bg-gray-700'
+              }`}
+              title={`${useDebugService ? 'Disable' : 'Enable'} frontend debug service with detailed logging`}
+            >
+              <AlertCircle size={16} />
+              {useDebugService ? 'Debug ON' : 'Debug OFF'}
+            </button>
+            <button
               onClick={() => setShowDebug(true)}
               className="bg-purple-600 text-white flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
               title="Open SFMC API debug panel"
             >
               <AlertCircle size={16} />
-              Debug
+              Debug Panel
             </button>
             <button
               onClick={handleRefresh}
