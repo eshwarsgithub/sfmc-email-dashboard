@@ -75,13 +75,19 @@ async function ensureAuthenticated() {
 // Fetch real email sends from SFMC
 async function fetchEmailSends(daysPeriod) {
   const endpoints = [
-    // Try Content Builder API
+    // Try Reports API (often has better access)
+    `${SFMC_CONFIG.baseUrl}/automation/v1/reports`,
+    // Try Email Send Definition API  
+    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/definitions`,
+    // Try Email Messages API
+    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages`,
+    // Try Legacy Send API
+    `${SFMC_CONFIG.baseUrl}/email/v1/send`,
+    // Try Discovery API
+    `${SFMC_CONFIG.baseUrl}/data/v1/metadata`,
+    // Original endpoints
     `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets`,
-    // Try Legacy Email API  
     `${SFMC_CONFIG.baseUrl}/email/v1/sends`,
-    // Try Platform Events API
-    `${SFMC_CONFIG.baseUrl}/platform/v1/send-definitions`,
-    // Try Data Extensions API for system tables
     `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Sent/rowset`
   ];
 
@@ -115,14 +121,20 @@ async function fetchEmailSends(daysPeriod) {
 // Fetch real tracking events from SFMC
 async function fetchTrackingEvents(daysPeriod) {
   const endpoints = [
-    // Try Data Extensions API for system tracking tables
+    // Try Journey Events API
+    `${SFMC_CONFIG.baseUrl}/interaction/v1/events`,
+    // Try Email Send Tracking API
+    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages/tracking`,
+    // Try Contact Events API  
+    `${SFMC_CONFIG.baseUrl}/contacts/v1/events`,
+    // Try Hub Events API (broader access)
+    `${SFMC_CONFIG.baseUrl}/hub/v1/events?$filter=eventCategoryType%20eq%20'email'`,
+    // Try Discovery for available data
+    `${SFMC_CONFIG.baseUrl}/data/v1/metadata/dataextensions`,
+    // Original tracking endpoints
     `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Open/rowset`,
     `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Click/rowset`,
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Bounce/rowset`,
-    // Try Platform Events API
-    `${SFMC_CONFIG.baseUrl}/platform/v1/events`,
-    // Try Asset API for campaign assets
-    `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets?assetType.name=email`
+    `${SFMC_CONFIG.baseUrl}/platform/v1/events`
   ];
 
   for (let i = 0; i < endpoints.length; i++) {
