@@ -86,15 +86,20 @@ async function ensureAuthenticated() {
 
 // Fetch real email sends from SFMC
 async function fetchEmailSends(daysPeriod) {
+  // These are the correct SFMC REST API endpoints based on official documentation
   const endpoints = [
-    // Try Content Builder API
-    `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets`,
-    // Try Legacy Email API  
-    `${SFMC_CONFIG.baseUrl}/email/v1/sends`,
+    // Try Data Extensions API - _Sent system table (most reliable for sent data)
+    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Sent/rowset`,
+    // Try Asset API for Email assets  
+    `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets?assetType.name=email`,
+    // Try Legacy Email API with proper path
+    `${SFMC_CONFIG.baseUrl}/email/v1/send`,
+    // Try Messaging API
+    `${SFMC_CONFIG.baseUrl}/messaging/v1/email/messages`,
     // Try Platform Events API
-    `${SFMC_CONFIG.baseUrl}/platform/v1/send-definitions`,
-    // Try Data Extensions API for system tables
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Sent/rowset`
+    `${SFMC_CONFIG.baseUrl}/platform/v1/emailsend-definitions`,
+    // Try Journey API for email activities
+    `${SFMC_CONFIG.baseUrl}/journey/v1/activities/email-v2`
   ];
 
   for (let i = 0; i < endpoints.length; i++) {
@@ -112,8 +117,15 @@ async function fetchEmailSends(daysPeriod) {
         timeout: 15000
       });
       
-      console.log(`✅ Endpoint ${i + 1} succeeded!`, response.data);
-      return response.data;
+      const data = response.data;
+      console.log(`✅ Endpoint ${i + 1} succeeded!`);
+      console.log(`   Response structure:`, {
+        hasItems: !!data.items,
+        itemCount: data.items ? data.items.length : 0,
+        hasKeys: Object.keys(data).join(', '),
+        sampleItem: data.items && data.items.length > 0 ? data.items[0] : null
+      });
+      return data;
     } catch (error) {
       console.log(`❌ Endpoint ${i + 1} failed:`, error.response?.status, error.response?.data?.message || error.message);
       continue;
@@ -126,15 +138,21 @@ async function fetchEmailSends(daysPeriod) {
 
 // Fetch real tracking events from SFMC
 async function fetchTrackingEvents(daysPeriod) {
+  // Calculate date filter for recent events
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysPeriod);
+  const dateFilter = startDate.toISOString().split('T')[0];
+  
   const endpoints = [
-    // Try Data Extensions API for system tracking tables
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Open/rowset`,
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Click/rowset`,
-    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Bounce/rowset`,
-    // Try Platform Events API
-    `${SFMC_CONFIG.baseUrl}/platform/v1/events`,
-    // Try Asset API for campaign assets
-    `${SFMC_CONFIG.baseUrl}/asset/v1/content/assets?assetType.name=email`
+    // Try Data Extensions API for system tracking tables (most reliable)
+    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Open/rowset?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Click/rowset?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Bounce/rowset?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    `${SFMC_CONFIG.baseUrl}/data/v1/customobjectdata/key/_Unsubscribe/rowset?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    // Try Platform Tracking API
+    `${SFMC_CONFIG.baseUrl}/platform/v1/tracking/opened?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    `${SFMC_CONFIG.baseUrl}/platform/v1/tracking/clicked?$filter=EventDate ge '${dateFilter}'&$top=100`,
+    `${SFMC_CONFIG.baseUrl}/platform/v1/tracking/bounced?$filter=EventDate ge '${dateFilter}'&$top=100`
   ];
 
   for (let i = 0; i < endpoints.length; i++) {
@@ -152,8 +170,15 @@ async function fetchTrackingEvents(daysPeriod) {
         timeout: 15000
       });
       
-      console.log(`✅ Tracking endpoint ${i + 1} succeeded!`, response.data);
-      return response.data;
+      const data = response.data;
+      console.log(`✅ Tracking endpoint ${i + 1} succeeded!`);
+      console.log(`   Response structure:`, {
+        hasItems: !!data.items,
+        itemCount: data.items ? data.items.length : 0,
+        hasKeys: Object.keys(data).join(', '),
+        sampleItem: data.items && data.items.length > 0 ? data.items[0] : null
+      });
+      return data;
     } catch (error) {
       console.log(`❌ Tracking endpoint ${i + 1} failed:`, error.response?.status, error.response?.data?.message || error.message);
       continue;
@@ -263,12 +288,41 @@ app.get('/api/dashboard', async (req, res) => {
       }
     }
 
-    // Fallback to demo data but mark as connected
-    console.log('🔄 Using intelligent demo data (SFMC connected but limited API permissions)');
+    // Check what SFMC data is actually available
+    console.log('🔄 SFMC connected but no email data found');
     const demoData = generateDemoData(daysPeriod);
-    demoData.isRealData = true; // We're successfully connected to SFMC
-    demoData.error = 'Connected to SFMC - Using intelligent demo data due to API permission limitations';
-    demoData.connectionStatus = 'Connected with limited permissions';
+    
+    // Try to get email definitions count to show real connection
+    try {
+      console.log('📊 Checking email definitions...');
+      const definitionsResponse = await axios.get(`${SFMC_CONFIG.baseUrl}/messaging/v1/email/definitions?$top=1`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      });
+      
+      const definitionCount = definitionsResponse.data.count || 0;
+      console.log(`📧 Found ${definitionCount} email definitions in SFMC`);
+      
+      demoData.isRealData = false;
+      demoData.error = `Connected to SFMC successfully! Found ${definitionCount} email definitions. Send some emails in SFMC to see real tracking data here.`;
+      demoData.connectionStatus = 'Connected - No email data yet';
+      demoData.sfmcConnected = true;
+      demoData.sfmcStats = {
+        emailDefinitions: definitionCount,
+        apiAccess: true,
+        instructions: 'Create and send emails in Salesforce Marketing Cloud to see real data here.'
+      };
+      
+    } catch (error) {
+      console.log('❌ Could not check email definitions:', error.message);
+      demoData.isRealData = false;
+      demoData.error = 'Connected to SFMC but API has limited permissions. Contact your SFMC admin to enable email tracking data access.';
+      demoData.connectionStatus = 'Connected with limited permissions';
+      demoData.sfmcConnected = true;
+    }
     
     res.json(demoData);
     

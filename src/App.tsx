@@ -290,9 +290,12 @@ const App: React.FC = () => {
               </div>
             </div>
             {error && (
-              <div className="error-banner">
-                <AlertCircle size={16} />
-                <span>⚠️ Using demo data: {error}</span>
+              <div className={`error-banner ${isConnected ? 'info-banner' : ''}`}>
+                {isConnected ? <Activity size={16} /> : <AlertCircle size={16} />}
+                <span>
+                  {isConnected ? '✅ ' : '⚠️ '}
+                  {isConnected ? error : `Using demo data: ${error}`}
+                </span>
               </div>
             )}
           </div>

@@ -95,6 +95,12 @@ body {
   font-size: 0.875rem;
 }
 
+.info-banner {
+  background-color: #e6fffa;
+  border: 1px solid #4fd1c7;
+  color: #065f46;
+}
+
 .header-controls {
   display: flex;
   align-items: center;
