@@ -21,6 +21,11 @@ import DynamicStatsBar from './components/DynamicStatsBar';
 import LiveUpdates from './components/LiveUpdates';
 import RecentDonations from './components/RecentDonations';
 import InteractiveMap from './components/InteractiveMap';
+import InteractivePhotoGallery from './components/InteractivePhotoGallery';
+import SimpleQuickDonate from './components/SimpleQuickDonate';
+import AnimatedThermometer from './components/AnimatedThermometer';
+import SimpleNavigation from './components/SimpleNavigation';
+import FloatingActionButton from './components/FloatingActionButton';
 import './App.css';
 
 interface DonationAmountProps {
@@ -195,12 +200,49 @@ const App: React.FC = () => {
     }
   };
 
+  const handleQuickDonate = async (amount: number, isQuick: boolean) => {
+    if (isQuick) {
+      // For quick donations, use minimal info
+      const quickDonorInfo = {
+        firstName: 'Anonymous',
+        lastName: 'Donor',
+        email: 'donor@example.com',
+        phone: '+1-000-000-0000'
+      };
+
+      setIsProcessing(true);
+      try {
+        const result = await paymentService.processDirectPayment({
+          amount,
+          currency: 'usd',
+          donorInfo: quickDonorInfo
+        });
+        
+        if (result.success) {
+          dynamicDataService.addDonation(amount, quickDonorInfo);
+        }
+      } catch (error) {
+        console.error('Quick donation error:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Regular donation flow
+      setDonationAmount(amount);
+      document.getElementById('donation-form')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const isValidForm = () => {
     return donationAmount > 0 && 
            donorInfo.firstName.trim() && 
            donorInfo.lastName.trim() && 
            donorInfo.email.trim() && 
            donorInfo.phone.trim();
+  };
+
+  const handleQuickDonateFromFAB = async () => {
+    await handleQuickDonate(50, true);
   };
 
   if (showThankYou) {
@@ -230,6 +272,8 @@ const App: React.FC = () => {
 
   return (
     <div className="donation-website">
+      <SimpleNavigation onQuickDonate={handleQuickDonateFromFAB} />
+      
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-overlay"></div>
@@ -266,9 +310,45 @@ const App: React.FC = () => {
       {/* Dynamic Stats Bar */}
       <DynamicStatsBar />
 
-      {/* Donation Form Section */}
-      <section className="donation-section">
+      {/* Quick Donate Section - Simplified for immediate action */}
+      <section className="quick-donate-section">
         <div className="container">
+          <SimpleQuickDonate 
+            onDonate={handleQuickDonate}
+            isProcessing={isProcessing}
+          />
+        </div>
+      </section>
+
+      {/* Interactive Photo Gallery */}
+      <section id="photo-stories" className="photo-stories-section">
+        <div className="container">
+          <InteractivePhotoGallery />
+        </div>
+      </section>
+
+      {/* Animated Progress Tracker */}
+      <section id="progress-tracker" className="progress-tracker-section">
+        <div className="container">
+          <AnimatedThermometer
+            currentAmount={2300000}
+            goalAmount={5000000}
+            familiesHelped={8500}
+            totalFamilies={15000}
+            daysLeft={45}
+          />
+        </div>
+      </section>
+
+      {/* Donation Form Section - For detailed donations */}
+      <section id="donation-form" className="donation-section">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem', color: '#2d3748' }}>
+            💝 Customize Your Donation
+          </h2>
+          <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#4a5568' }}>
+            Want to add a personal touch? Fill out your details below for a personalized donation experience.
+          </p>
           <div className="donation-grid">
             <div className="donation-form">
               <h2>Make a Difference Today</h2>
@@ -537,6 +617,8 @@ const App: React.FC = () => {
           </div>
         </div>
       </footer>
+      
+      <FloatingActionButton onQuickDonate={handleQuickDonateFromFAB} />
     </div>
   );
 };
