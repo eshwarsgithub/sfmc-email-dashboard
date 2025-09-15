@@ -16,6 +16,11 @@ import {
   AlertCircle
 } from 'lucide-react';
 import paymentService from './services/paymentService';
+import dynamicDataService from './services/dynamicDataService';
+import DynamicStatsBar from './components/DynamicStatsBar';
+import LiveUpdates from './components/LiveUpdates';
+import RecentDonations from './components/RecentDonations';
+import InteractiveMap from './components/InteractiveMap';
 import './App.css';
 
 interface DonationAmountProps {
@@ -176,6 +181,8 @@ const App: React.FC = () => {
       const result = await paymentService.processDirectPayment(donationData);
       
       if (result.success) {
+        // Add the donation to the dynamic data service for real-time updates
+        dynamicDataService.addDonation(donationAmount, donorInfo);
         setShowThankYou(true);
       } else {
         setPaymentError(result.error || 'Payment processing failed. Please try again.');
@@ -255,6 +262,9 @@ const App: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Dynamic Stats Bar */}
+      <DynamicStatsBar />
 
       {/* Donation Form Section */}
       <section className="donation-section">
@@ -426,9 +436,22 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="crisis-image">
-              <div className="placeholder-image">
-                <span>Punjab Floods 2025 - Emergency Relief Needed</span>
-              </div>
+              <InteractiveMap />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Activity Section */}
+      <section className="live-activity-section">
+        <div className="container">
+          <h2>Live Relief Activity</h2>
+          <div className="activity-grid">
+            <div className="activity-item">
+              <LiveUpdates />
+            </div>
+            <div className="activity-item">
+              <RecentDonations />
             </div>
           </div>
         </div>
