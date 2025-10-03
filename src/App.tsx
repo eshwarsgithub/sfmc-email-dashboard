@@ -1,514 +1,624 @@
 // src/App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
-import { 
-  Mail, 
-  TrendingUp, 
-  MousePointer, 
-  AlertCircle, 
-  RefreshCw, 
-  Wifi, 
-  WifiOff,
-  Activity,
+  Heart, 
+  Users, 
+  Shield, 
+  DollarSign, 
+  MapPin, 
   Calendar,
-  Upload,
-  Download
+  Star,
+  CheckCircle,
+  ArrowRight,
+  Phone,
+  Mail,
+  Globe,
+  AlertCircle
 } from 'lucide-react';
-import sfmcService from './services/sfmcService';
-import type { DashboardData } from './services/sfmcService';
-import DebugSFMCService from './services/debugSfmcService';
-import DataUpload from './components/DataUpload';
-import DebugPanel from './components/DebugPanel';
+import paymentService from './services/paymentService';
+import dynamicDataService from './services/dynamicDataService';
+import DynamicStatsBar from './components/DynamicStatsBar';
+import LiveUpdates from './components/LiveUpdates';
+import RecentDonations from './components/RecentDonations';
+import InteractiveMap from './components/InteractiveMap';
+import InteractivePhotoGallery from './components/InteractivePhotoGallery';
+import SimpleQuickDonate from './components/SimpleQuickDonate';
+import AnimatedThermometer from './components/AnimatedThermometer';
+import SimpleNavigation from './components/SimpleNavigation';
+import FloatingActionButton from './components/FloatingActionButton';
 import './App.css';
 
-interface StatCardProps {
-  icon: React.ElementType;
-  title: string;
-  value: number | string;
-  subtitle?: string;
-  trend?: number;
-  color?: 'blue' | 'green' | 'orange' | 'red';
+interface DonationAmountProps {
+  amount: number;
+  selected: boolean;
+  onClick: (amount: number) => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ 
-  icon: Icon, 
-  title, 
-  value, 
-  subtitle, 
-  trend, 
-  color = 'blue' 
-}) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    orange: 'bg-orange-50 text-orange-600 border-orange-200',
-    red: 'bg-red-50 text-red-600 border-red-200'
-  };
-
+const DonationAmount: React.FC<DonationAmountProps> = ({ amount, selected, onClick }) => {
   return (
-    <div className="stat-card">
-      <div className="stat-card-header">
-        <div className={`stat-icon ${colorClasses[color]}`}>
-          <Icon size={24} />
-        </div>
-        {trend && (
-          <div className={`trend ${trend > 0 ? 'trend-positive' : 'trend-negative'}`}>
-            {trend > 0 ? '+' : ''}{trend}%
-          </div>
-        )}
+    <button
+      onClick={() => onClick(amount)}
+      className={`donation-amount ${selected ? 'selected' : ''}`}
+    >
+      ${amount}
+    </button>
+  );
+};
+
+interface ImpactCardProps {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  amount: string;
+}
+
+const ImpactCard: React.FC<ImpactCardProps> = ({ icon: Icon, title, description, amount }) => {
+  return (
+    <div className="impact-card">
+      <div className="impact-icon">
+        <Icon size={32} />
       </div>
-      <div className="stat-card-content">
-        <h3 className="stat-value">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-        </h3>
-        <p className="stat-title">{title}</p>
-        {subtitle && <p className="stat-subtitle">{subtitle}</p>}
+      <h3>{title}</h3>
+      <p>{description}</p>
+      <div className="impact-amount">{amount}</div>
+    </div>
+  );
+};
+
+interface TestimonialProps {
+  name: string;
+  message: string;
+  location: string;
+}
+
+const Testimonial: React.FC<TestimonialProps> = ({ name, message, location }) => {
+  return (
+    <div className="testimonial">
+      <div className="testimonial-stars">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star key={star} size={16} fill="#fbbf24" color="#fbbf24" />
+        ))}
+      </div>
+      <p className="testimonial-message">"{message}"</p>
+      <div className="testimonial-author">
+        <strong>{name}</strong>
+        <span>{location}</span>
       </div>
     </div>
   );
 };
 
-interface CampaignRowProps {
-  campaign: DashboardData['campaigns'][0];
-}
+const App: React.FC = () => {
+  const [donationAmount, setDonationAmount] = useState<number>(50);
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [donorInfo, setDonorInfo] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: ''
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-const CampaignRow: React.FC<CampaignRowProps> = ({ campaign }) => {
-  const openRate = campaign.sent > 0 ? ((campaign.opened / campaign.sent) * 100).toFixed(1) : '0.0';
-  const clickRate = campaign.sent > 0 ? ((campaign.clicked / campaign.sent) * 100).toFixed(1) : '0.0';
+  const predefinedAmounts = [25, 50, 100, 250, 500, 1000];
   
-  const statusColors = {
-    'Completed': 'status-completed',
-    'Active': 'status-active',
-    'Scheduled': 'status-scheduled'
+  const impactData = [
+    {
+      icon: Users,
+      title: "Emergency Relief",
+      description: "Provides emergency food and water for a family for one week",
+      amount: "$50"
+    },
+    {
+      icon: Shield,
+      title: "Medical Aid",
+      description: "Covers basic medical supplies and first aid for flood victims",
+      amount: "$100"
+    },
+    {
+      icon: Heart,
+      title: "Temporary Shelter",
+      description: "Helps provide temporary housing materials for displaced families",
+      amount: "$250"
+    }
+  ];
+
+  const testimonials = [
+    {
+      name: "Sarah Johnson",
+      message: "Knowing my donation directly helps flood victims in Punjab gives me hope. This organization is transparent and effective.",
+      location: "California, USA"
+    },
+    {
+      name: "Michael Chen",
+      message: "I've donated multiple times. They provide regular updates on how the funds are being used. Highly recommend!",
+      location: "New York, USA"
+    },
+    {
+      name: "Emily Rodriguez",
+      message: "The impact reports they send show exactly how my contributions are making a difference. Very trustworthy.",
+      location: "Texas, USA"
+    }
+  ];
+
+  const handleDonationAmountSelect = (amount: number) => {
+    setDonationAmount(amount);
+    setCustomAmount('');
+    setPaymentError(null);
   };
 
-  return (
-    <tr className="campaign-row">
-      <td className="campaign-name">
-        <div>
-          <div className="campaign-title">{campaign.name}</div>
-          <div className="campaign-date">{new Date(campaign.date).toLocaleDateString()}</div>
-        </div>
-      </td>
-      <td className="campaign-status">
-        <span className={`status ${statusColors[campaign.status as keyof typeof statusColors] || 'status-completed'}`}>
-          {campaign.status}
-        </span>
-      </td>
-      <td className="campaign-metric">{campaign.sent.toLocaleString()}</td>
-      <td className="campaign-metric">{campaign.opened.toLocaleString()}</td>
-      <td className="campaign-rate open-rate">{openRate}%</td>
-      <td className="campaign-metric">{campaign.clicked.toLocaleString()}</td>
-      <td className="campaign-rate click-rate">{clickRate}%</td>
-    </tr>
-  );
-};
+  const handleCustomAmountChange = (value: string) => {
+    const numericValue = parseInt(value);
+    if (!isNaN(numericValue) && numericValue > 0) {
+      setDonationAmount(numericValue);
+      setCustomAmount(value);
+      setPaymentError(null);
+    } else {
+      setCustomAmount(value);
+    }
+  };
 
-const App: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState('30days');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [showUpload, setShowUpload] = useState(false);
-  const [dataSource, setDataSource] = useState<'api' | 'csv' | 'manual'>('api');
-  const [showDebug, setShowDebug] = useState(false);
-  const [useDebugService, setUseDebugService] = useState(false);
+  const handleDonorInfoChange = (field: string, value: string) => {
+    setDonorInfo(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setPaymentError(null);
+  };
 
-  // Initialize debug service
-  const debugSfmcService = new DebugSFMCService({
-    clientId: import.meta.env.VITE_SFMC_CLIENT_ID || '',
-    clientSecret: import.meta.env.VITE_SFMC_CLIENT_SECRET || '',
-    subdomain: import.meta.env.VITE_SFMC_SUBDOMAIN || ''
-  });
+  const handleDonateNow = async () => {
+    if (!isValidForm()) {
+      setPaymentError('Please fill in all required fields');
+      return;
+    }
 
-  // Add error logging
-  useEffect(() => {
-    console.log('App component mounted');
-    console.log('Environment check:', {
-      clientId: import.meta.env.VITE_SFMC_CLIENT_ID,
-      subdomain: import.meta.env.VITE_SFMC_SUBDOMAIN,
-      hasClientSecret: !!import.meta.env.VITE_SFMC_CLIENT_SECRET
-    });
-  }, []);
+    setIsProcessing(true);
+    setPaymentError(null);
 
-  // Load dashboard data
-  const loadDashboardData = async (showLoading = true) => {
     try {
-      if (showLoading) setIsLoading(true);
-      setError(null);
+      const donationData = {
+        amount: donationAmount,
+        currency: 'usd',
+        donorInfo
+      };
+
+      const result = await paymentService.processDirectPayment(donationData);
       
-      const period = selectedPeriod === '7days' ? 7 : selectedPeriod === '30days' ? 30 : 90;
-      
-      // Use debug service if enabled, otherwise use regular service
-      const serviceToUse = useDebugService ? debugSfmcService : sfmcService;
-      console.log(`🔄 Using ${useDebugService ? 'Debug' : 'Regular'} SFMC Service`);
-      
-      const dashboardData = await serviceToUse.getDashboardData(period);
-      
-      setData(dashboardData);
-      setLastUpdated(new Date());
-      setIsConnected(dashboardData.sfmcConnected || dashboardData.isRealData);
-      
-      if (dashboardData.error && !dashboardData.sfmcConnected) {
-        setError(dashboardData.error);
-      } else if (dashboardData.connectionStatus) {
-        setError(dashboardData.connectionStatus);
+      if (result.success) {
+        // Add the donation to the dynamic data service for real-time updates
+        dynamicDataService.addDonation(donationAmount, donorInfo);
+        setShowThankYou(true);
       } else {
-        setError(null);
+        setPaymentError(result.error || 'Payment processing failed. Please try again.');
       }
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      setError((error as Error).message);
-      setIsConnected(false);
+      console.error('Payment error:', error);
+      setPaymentError('An unexpected error occurred. Please try again.');
     } finally {
-      if (showLoading) setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
-  // Initial load and auto-refresh setup
-  useEffect(() => {
-    loadDashboardData();
-    
-    // Set up auto-refresh every 15 minutes
-    const interval = setInterval(() => loadDashboardData(false), 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [selectedPeriod, useDebugService]);
+  const handleQuickDonate = async (amount: number, isQuick: boolean) => {
+    if (isQuick) {
+      // For quick donations, use minimal info
+      const quickDonorInfo = {
+        firstName: 'Anonymous',
+        lastName: 'Donor',
+        email: 'donor@example.com',
+        phone: '+1-000-000-0000'
+      };
 
-  // Manual refresh function
-  const handleRefresh = () => {
-    loadDashboardData();
-  };
-
-  // Handle uploaded data
-  const handleDataUploaded = (uploadedData: Partial<DashboardData>) => {
-    if (uploadedData.campaigns) {
-      setDataSource(uploadedData.connectionStatus?.includes('CSV') ? 'csv' : 'manual');
+      setIsProcessing(true);
+      try {
+        const result = await paymentService.processDirectPayment({
+          amount,
+          currency: 'usd',
+          donorInfo: quickDonorInfo
+        });
+        
+        if (result.success) {
+          dynamicDataService.addDonation(amount, quickDonorInfo);
+        }
+      } catch (error) {
+        console.error('Quick donation error:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Regular donation flow
+      setDonationAmount(amount);
+      document.getElementById('donation-form')?.scrollIntoView({ behavior: 'smooth' });
     }
-    
-    const mergedData: DashboardData = {
-      overview: uploadedData.overview || data?.overview || {
-        totalSent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0
-      },
-      trends: uploadedData.trends || data?.trends || [],
-      campaigns: uploadedData.campaigns || data?.campaigns || [],
-      isRealData: true,
-      connectionStatus: uploadedData.connectionStatus,
-      sfmcConnected: uploadedData.sfmcConnected || false
-    };
-
-    setData(mergedData);
-    setLastUpdated(new Date());
-    setIsConnected(true);
-    setShowUpload(false);
-    setError(null);
   };
 
-  // Export data as CSV
-  const exportData = () => {
-    if (!data) return;
-
-    const csvContent = [
-      ['Campaign Name', 'Date', 'Status', 'Sent', 'Delivered', 'Opened', 'Clicked', 'Bounced', 'Open Rate', 'Click Rate'].join(','),
-      ...data.campaigns.map(campaign => [
-        `"${campaign.name}"`,
-        campaign.date,
-        campaign.status,
-        campaign.sent,
-        campaign.sent, // delivered
-        campaign.opened,
-        campaign.clicked,
-        0, // bounced (if not available)
-        campaign.sent > 0 ? ((campaign.opened / campaign.sent) * 100).toFixed(2) : '0',
-        campaign.sent > 0 ? ((campaign.clicked / campaign.sent) * 100).toFixed(2) : '0'
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `email_campaigns_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const isValidForm = () => {
+    return donationAmount > 0 && 
+           donorInfo.firstName.trim() && 
+           donorInfo.lastName.trim() && 
+           donorInfo.email.trim() && 
+           donorInfo.phone.trim();
   };
 
-  if (!data) {
+  const handleQuickDonateFromFAB = async () => {
+    await handleQuickDonate(50, true);
+  };
+
+  if (showThankYou) {
     return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <RefreshCw className="loading-spinner" />
-          <h3>Loading Dashboard</h3>
-          <p>Connecting to Salesforce Marketing Cloud...</p>
+      <div className="thank-you-container">
+        <div className="thank-you-content">
+          <CheckCircle size={64} className="thank-you-icon" />
+          <h1>Thank You for Your Generosity!</h1>
+          <p>Your donation of <strong>${donationAmount}</strong> will make a real difference in the lives of Punjab flood victims.</p>
+          <p>You will receive an email confirmation shortly with your donation receipt.</p>
+          <button 
+            onClick={() => {
+              setShowThankYou(false);
+              setDonationAmount(50);
+              setCustomAmount('');
+              setDonorInfo({ firstName: '', lastName: '', email: '', phone: '' });
+              setPaymentError(null);
+            }}
+            className="btn-primary"
+          >
+            Make Another Donation
+          </button>
         </div>
       </div>
     );
   }
 
-  const calculateRate = (numerator: number, denominator: number) => {
-    return denominator > 0 ? ((numerator / denominator) * 100).toFixed(1) : '0.0';
-  };
-
-  const openRate = calculateRate(data.overview.opened, data.overview.delivered);
-  const clickRate = calculateRate(data.overview.clicked, data.overview.delivered);
-  const bounceRate = calculateRate(data.overview.bounced, data.overview.totalSent);
-
-  const pieData = [
-    { name: 'Opened', value: data.overview.opened, color: '#10b981' },
-    { name: 'Clicked', value: data.overview.clicked, color: '#3b82f6' },
-    { name: 'Bounced', value: data.overview.bounced, color: '#ef4444' },
-    { name: 'Not Opened', value: data.overview.delivered - data.overview.opened, color: '#e5e7eb' }
-  ];
-
   return (
-    <div className="dashboard">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="header-content">
-          <div className="header-title">
-            <h1>{import.meta.env.VITE_DASHBOARD_TITLE || 'Email Campaign Dashboard'}</h1>
-            <div className="header-subtitle">
-              <p>Real-time insights from Salesforce Marketing Cloud</p>
-              <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-                {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
-                {dataSource === 'api' && isConnected && 'SFMC Connected'}
-                {dataSource === 'csv' && 'CSV Data'}
-                {dataSource === 'manual' && 'Manual Data'}
-                {!isConnected && 'Demo Mode'}
+    <div className="donation-website">
+      <SimpleNavigation onQuickDonate={handleQuickDonateFromFAB} />
+      
+      {/* Hero Section */}
+      <section className="hero-section">
+        <div className="hero-overlay"></div>
+        <div className="hero-content">
+          <div className="container">
+            <div className="hero-text">
+              <h1>Punjab Floods 2025 Relief Fund</h1>
+              <p className="hero-subtitle">
+                "In times of crisis, humanity shines brightest. Your donation today becomes hope tomorrow."
+              </p>
+              <p className="hero-description">
+                Devastating floods have displaced thousands of families across Punjab. 
+                Your support provides immediate relief, clean water, food, and temporary shelter to those in desperate need.
+              </p>
+              <div className="hero-stats">
+                <div className="stat">
+                  <span className="stat-number">15,000+</span>
+                  <span className="stat-label">Families Affected</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-number">$2.3M</span>
+                  <span className="stat-label">Raised So Far</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-number">5,000+</span>
+                  <span className="stat-label">Donors Worldwide</span>
+                </div>
               </div>
-            </div>
-            {error && (
-              <div className={`error-banner ${isConnected ? 'info-banner' : ''}`}>
-                {isConnected ? <Activity size={16} /> : <AlertCircle size={16} />}
-                <span>
-                  {isConnected ? '✅ ' : '⚠️ '}
-                  {isConnected ? error : `Using demo data: ${error}`}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="header-controls">
-            <select 
-              id="period-selector"
-              name="period-selector"
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="period-selector"
-              disabled={isLoading}
-            >
-              <option value="7days">Last 7 Days</option>
-              <option value="30days">Last 30 Days</option>
-              <option value="90days">Last 90 Days</option>
-            </select>
-            <button
-              onClick={() => setShowUpload(true)}
-              className="upload-button"
-              title="Import your email campaign data"
-            >
-              <Upload size={16} />
-              Import Data
-            </button>
-            <button
-              onClick={exportData}
-              disabled={!data?.campaigns?.length}
-              className="export-button"
-              title="Export current data as CSV"
-            >
-              <Download size={16} />
-              Export
-            </button>
-            <button
-              onClick={() => setUseDebugService(!useDebugService)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                useDebugService 
-                ? 'bg-green-600 text-white hover:bg-green-700' 
-                : 'bg-gray-600 text-white hover:bg-gray-700'
-              }`}
-              title={`${useDebugService ? 'Disable' : 'Enable'} frontend debug service with detailed logging`}
-            >
-              <AlertCircle size={16} />
-              {useDebugService ? 'Debug ON' : 'Debug OFF'}
-            </button>
-            <button
-              onClick={() => setShowDebug(true)}
-              className="bg-purple-600 text-white flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-              title="Open SFMC API debug panel"
-            >
-              <AlertCircle size={16} />
-              Debug Panel
-            </button>
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="refresh-button"
-            >
-              <RefreshCw size={16} className={isLoading ? 'spinning' : ''} />
-              {isLoading ? 'Refreshing' : 'Refresh'}
-            </button>
-            <div className="last-updated">
-              <Activity size={16} />
-              {lastUpdated ? `Updated: ${lastUpdated.toLocaleTimeString()}` : 'Never updated'}
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="dashboard-main">
-        {/* Key Metrics */}
-        <section className="metrics-grid">
-          <StatCard
-            icon={Mail}
-            title="Total Emails Sent"
-            value={data.overview.totalSent}
-            subtitle={`${data.overview.delivered.toLocaleString()} delivered`}
-            color="blue"
-          />
-          <StatCard
-            icon={TrendingUp}
-            title="Open Rate"
-            value={`${openRate}%`}
-            subtitle={`${data.overview.opened.toLocaleString()} opens`}
-            trend={2.3}
-            color="green"
-          />
-          <StatCard
-            icon={MousePointer}
-            title="Click Rate"
-            value={`${clickRate}%`}
-            subtitle={`${data.overview.clicked.toLocaleString()} clicks`}
-            trend={-0.5}
-            color="orange"
-          />
-          <StatCard
-            icon={AlertCircle}
-            title="Bounce Rate"
-            value={`${bounceRate}%`}
-            subtitle={`${data.overview.bounced.toLocaleString()} bounces`}
-            trend={-1.2}
-            color="red"
-          />
-        </section>
+      {/* Dynamic Stats Bar */}
+      <DynamicStatsBar />
 
-        {/* Charts Row */}
-        <section className="charts-grid">
-          {/* Trend Chart */}
-          <div className="chart-container trends-chart">
-            <h3>Performance Trends</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data.trends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Line type="monotone" dataKey="opens" stroke="#10b981" strokeWidth={2} name="Opens" />
-                <Line type="monotone" dataKey="clicks" stroke="#3b82f6" strokeWidth={2} name="Clicks" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Quick Donate Section - Simplified for immediate action */}
+      <section className="quick-donate-section">
+        <div className="container">
+          <SimpleQuickDonate 
+            onDonate={handleQuickDonate}
+            isProcessing={isProcessing}
+          />
+        </div>
+      </section>
 
-          {/* Pie Chart */}
-          <div className="chart-container engagement-chart">
-            <h3>Engagement Overview</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => value.toLocaleString()} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pie-legend">
-              {pieData.map((item, index) => (
-                <div key={index} className="legend-item">
-                  <div className="legend-color" style={{ backgroundColor: item.color }}></div>
-                  <span className="legend-label">{item.name}</span>
-                  <span className="legend-value">{item.value.toLocaleString()}</span>
+      {/* Interactive Photo Gallery */}
+      <section id="photo-stories" className="photo-stories-section">
+        <div className="container">
+          <InteractivePhotoGallery />
+        </div>
+      </section>
+
+      {/* Animated Progress Tracker */}
+      <section id="progress-tracker" className="progress-tracker-section">
+        <div className="container">
+          <AnimatedThermometer
+            currentAmount={2300000}
+            goalAmount={5000000}
+            familiesHelped={8500}
+            totalFamilies={15000}
+            daysLeft={45}
+          />
+        </div>
+      </section>
+
+      {/* Donation Form Section - For detailed donations */}
+      <section id="donation-form" className="donation-section">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem', color: '#2d3748' }}>
+            💝 Customize Your Donation
+          </h2>
+          <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#4a5568' }}>
+            Want to add a personal touch? Fill out your details below for a personalized donation experience.
+          </p>
+          <div className="donation-grid">
+            <div className="donation-form">
+              <h2>Make a Difference Today</h2>
+              <p>Every dollar counts. Choose your impact:</p>
+              
+              {paymentError && (
+                <div className="error-message">
+                  <AlertCircle size={16} />
+                  <span>{paymentError}</span>
                 </div>
-              ))}
+              )}
+              
+              <div className="amount-selection">
+                <h3>Select Amount (USD)</h3>
+                <div className="amount-grid">
+                  {predefinedAmounts.map(amount => (
+                    <DonationAmount
+                      key={amount}
+                      amount={amount}
+                      selected={donationAmount === amount && !customAmount}
+                      onClick={handleDonationAmountSelect}
+                    />
+                  ))}
+                </div>
+                <div className="custom-amount">
+                  <label>Other Amount:</label>
+                  <div className="input-group">
+                    <span className="input-prefix">$</span>
+                    <input
+                      type="number"
+                      placeholder="Enter amount"
+                      value={customAmount}
+                      onChange={(e) => handleCustomAmountChange(e.target.value)}
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="donor-info">
+                <h3>Your Information</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>First Name *</label>
+                    <input
+                      type="text"
+                      value={donorInfo.firstName}
+                      onChange={(e) => handleDonorInfoChange('firstName', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Last Name *</label>
+                    <input
+                      type="text"
+                      value={donorInfo.lastName}
+                      onChange={(e) => handleDonorInfoChange('lastName', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email *</label>
+                    <input
+                      type="email"
+                      value={donorInfo.email}
+                      onChange={(e) => handleDonorInfoChange('email', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Phone *</label>
+                    <input
+                      type="tel"
+                      value={donorInfo.phone}
+                      onChange={(e) => handleDonorInfoChange('phone', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="donation-summary">
+                <div className="summary-row">
+                  <span>Donation Amount:</span>
+                  <span className="amount">${donationAmount}</span>
+                </div>
+                <div className="summary-row total">
+                  <span>Total:</span>
+                  <span className="amount">${donationAmount}</span>
+                </div>
+                <p className="tax-info">This donation is tax-deductible. You will receive a receipt via email.</p>
+              </div>
+
+              <button
+                onClick={handleDonateNow}
+                disabled={!isValidForm() || isProcessing}
+                className="donate-button"
+              >
+                {isProcessing ? (
+                  <>Processing... Please Wait</>
+                ) : (
+                  <>
+                    Donate ${donationAmount} Now
+                    <ArrowRight size={20} />
+                  </>
+                )}
+              </button>
+
+              <div className="security-badges">
+                <Shield size={16} />
+                <span>256-bit SSL encrypted • PCI DSS compliant</span>
+              </div>
+            </div>
+
+            <div className="impact-info">
+              <h3>Your Impact</h3>
+              <div className="impact-cards">
+                {impactData.map((impact, index) => (
+                  <ImpactCard key={index} {...impact} />
+                ))}
+              </div>
+              
+              <div className="urgent-update">
+                <Calendar size={20} />
+                <div>
+                  <h4>Latest Update</h4>
+                  <p>September 15, 2025 - Our teams have distributed emergency supplies to 3,000 families in Ludhiana and Patiala districts. Clean water systems restored in 12 villages.</p>
+                </div>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Campaign Table */}
-        <section className="campaigns-section">
-          <div className="section-header">
-            <h3>Recent Campaigns</h3>
-            <Calendar size={20} />
+      {/* Crisis Information */}
+      <section className="crisis-info">
+        <div className="container">
+          <div className="crisis-content">
+            <div className="crisis-text">
+              <h2>The Crisis</h2>
+              <p>
+                "When disaster strikes, it's not just homes that are lost—it's hope. But together, we can rebuild both."
+              </p>
+              <p>
+                Unprecedented monsoon rains have caused severe flooding across Punjab, affecting over 15,000 families. 
+                Villages are submerged, crops destroyed, and thousands have been forced to evacuate their homes. 
+                The immediate needs are shelter, clean drinking water, food, and medical aid.
+              </p>
+              
+              <div className="crisis-stats">
+                <div className="crisis-stat">
+                  <MapPin className="icon" />
+                  <div>
+                    <strong>8 Districts Affected</strong>
+                    <span>Ludhiana, Patiala, Mohali, and 5 others</span>
+                  </div>
+                </div>
+                <div className="crisis-stat">
+                  <Users className="icon" />
+                  <div>
+                    <strong>60,000+ People Displaced</strong>
+                    <span>Including 18,000 children</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="crisis-image">
+              <InteractiveMap />
+            </div>
           </div>
-          <div className="table-container">
-            <table className="campaigns-table">
-              <thead>
-                <tr>
-                  <th>Campaign</th>
-                  <th>Status</th>
-                  <th>Sent</th>
-                  <th>Opens</th>
-                  <th>Open Rate</th>
-                  <th>Clicks</th>
-                  <th>CTR</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.campaigns.map((campaign, index) => (
-                  <CampaignRow key={campaign.id || index} campaign={campaign} />
-                ))}
-              </tbody>
-            </table>
+        </div>
+      </section>
+
+      {/* Live Activity Section */}
+      <section className="live-activity-section">
+        <div className="container">
+          <h2>Live Relief Activity</h2>
+          <div className="activity-grid">
+            <div className="activity-item">
+              <LiveUpdates />
+            </div>
+            <div className="activity-item">
+              <RecentDonations />
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="testimonials-section">
+        <div className="container">
+          <h2>What Our Donors Say</h2>
+          <div className="testimonials-grid">
+            {testimonials.map((testimonial, index) => (
+              <Testimonial key={index} {...testimonial} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Transparency Section */}
+      <section className="transparency-section">
+        <div className="container">
+          <h2>Complete Transparency</h2>
+          <div className="transparency-grid">
+            <div className="transparency-card">
+              <div className="transparency-icon">
+                <DollarSign size={32} />
+              </div>
+              <h3>100% of Donations Go to Relief</h3>
+              <p>Administrative costs are covered separately. Every dollar you donate directly supports flood victims.</p>
+            </div>
+            <div className="transparency-card">
+              <div className="transparency-icon">
+                <CheckCircle size={32} />
+              </div>
+              <h3>Regular Impact Reports</h3>
+              <p>Receive monthly updates with photos, stories, and detailed reports on how your contribution is making a difference.</p>
+            </div>
+            <div className="transparency-card">
+              <div className="transparency-icon">
+                <Shield size={32} />
+              </div>
+              <h3>Secure & Verified</h3>
+              <p>Registered 501(c)(3) non-profit organization. All donations are tax-deductible and receipts provided.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="dashboard-footer">
-        <div className="footer-content">
-          <div>Powered by Salesforce Marketing Cloud</div>
-          <div>Data refreshed every 15 minutes</div>
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-section">
+              <h3>Punjab Floods Relief</h3>
+              <p>A non-profit organization dedicated to providing emergency relief and long-term support to flood victims in Punjab.</p>
+              <div className="footer-quote">
+                "Hope is the thing with feathers that perches in the soul." - Emily Dickinson
+              </div>
+            </div>
+            <div className="footer-section">
+              <h4>Contact Us</h4>
+              <div className="contact-info">
+                <div className="contact-item">
+                  <Phone size={16} />
+                  <span>+1 (555) 123-4567</span>
+                </div>
+                <div className="contact-item">
+                  <Mail size={16} />
+                  <span>help@punjabrelief.org</span>
+                </div>
+                <div className="contact-item">
+                  <Globe size={16} />
+                  <span>www.punjabrelief.org</span>
+                </div>
+              </div>
+            </div>
+            <div className="footer-section">
+              <h4>Our Promise</h4>
+              <p>We are committed to transparency, accountability, and ensuring every donation creates maximum impact for those in need.</p>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <p>&copy; 2025 Punjab Floods Relief Fund. All rights reserved. | Tax ID: 123-45-6789</p>
+          </div>
         </div>
       </footer>
-
-      {/* Data Upload Modal */}
-      {showUpload && (
-        <DataUpload
-          onDataUploaded={handleDataUploaded}
-          onClose={() => setShowUpload(false)}
-        />
-      )}
-
-      {/* Debug Panel */}
-      {showDebug && (
-        <DebugPanel
-          onClose={() => setShowDebug(false)}
-        />
-      )}
+      
+      <FloatingActionButton onQuickDonate={handleQuickDonateFromFAB} />
     </div>
   );
 };
